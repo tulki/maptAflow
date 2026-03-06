@@ -1,0 +1,40 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Node / frontend
+node_modules/
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+dist/
+build/
+.cache/
+.vite/
+.solid/
+*.log
+
+# Rust / Cargo
+target/
+**/*.rs.bk
+
+# Tauri
+src-tauri/target/
+src-tauri/.tauri-build
+src-tauri/tauri.conf.json.bak
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Local data / SQLite
+*.db
+*.sqlite
+*.sqlite3
+*.mapta
+
+# Env / secrets (если будут)
+.env
+.env.local
+.env.*
