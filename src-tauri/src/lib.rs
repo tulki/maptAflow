@@ -6,8 +6,6 @@ use crate::app::commands::{
     count_nodes,
     create_node,
     list_nodes_with_positions,
-    list_root_nodes,
-    list_root_nodes_with_positions,
     set_node_parent,
     update_node_position,
 };
@@ -33,8 +31,6 @@ pub fn run() {
             greet,
             count_nodes,
             create_node,
-            list_root_nodes,
-            list_root_nodes_with_positions,
             list_nodes_with_positions,
             set_node_parent,
             update_node_position
