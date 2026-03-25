@@ -5,15 +5,16 @@ pub mod infrastructure;
 use crate::app::commands::{
     count_nodes,
     create_root_node,
+    list_nodes_with_positions,
     list_root_nodes,
     list_root_nodes_with_positions,
+    set_node_parent,
     update_node_position,
 };
 use crate::app::state::AppState;
 use crate::infrastructure::db::connection::open_database;
 use std::sync::Mutex;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -34,6 +35,8 @@ pub fn run() {
             create_root_node,
             list_root_nodes,
             list_root_nodes_with_positions,
+            list_nodes_with_positions,
+            set_node_parent,
             update_node_position
         ])
         .run(tauri::generate_context!())

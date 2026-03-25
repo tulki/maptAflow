@@ -5,7 +5,7 @@ use tauri::State;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize)]
-pub struct RootNodeWithPosition {
+pub struct NodeWithPosition {
     pub id: String,
     pub parent_id: Option<String>,
     pub title: String,
@@ -23,6 +23,12 @@ pub struct UpdateNodePositionInput {
     pub node_id: String,
     pub x: f64,
     pub y: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SetNodeParentInput {
+    pub node_id: String,
+    pub parent_id: Option<String>,
 }
 
 #[tauri::command]
@@ -79,7 +85,7 @@ pub fn list_root_nodes(state: State<AppState>) -> Result<Vec<Node>, String> {
 #[tauri::command]
 pub fn list_root_nodes_with_positions(
     state: State<AppState>,
-) -> Result<Vec<RootNodeWithPosition>, String> {
+) -> Result<Vec<NodeWithPosition>, String> {
     let conn = state
         .conn
         .lock()
@@ -109,7 +115,58 @@ pub fn list_root_nodes_with_positions(
 
     let rows = stmt
         .query_map([], |row| {
-            Ok(RootNodeWithPosition {
+            Ok(NodeWithPosition {
+                id: row.get(0)?,
+                parent_id: row.get(1)?,
+                title: row.get(2)?,
+                description: row.get(3)?,
+                status: row.get(4)?,
+                sort_order: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+                x: row.get(8)?,
+                y: row.get(9)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let nodes: Result<Vec<_>, _> = rows.collect();
+    nodes.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_nodes_with_positions(
+    state: State<AppState>,
+) -> Result<Vec<NodeWithPosition>, String> {
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|_| "failed to lock database connection".to_string())?;
+
+    let mut stmt = conn
+        .prepare(
+            "
+            SELECT
+                n.id,
+                n.parent_id,
+                n.title,
+                n.description,
+                n.status,
+                n.sort_order,
+                n.created_at,
+                n.updated_at,
+                COALESCE(p.x, 0.0) AS x,
+                COALESCE(p.y, 0.0) AS y
+            FROM nodes n
+            LEFT JOIN node_positions p ON p.node_id = n.id
+            ORDER BY n.sort_order ASC, n.created_at ASC
+            ",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(NodeWithPosition {
                 id: row.get(0)?,
                 parent_id: row.get(1)?,
                 title: row.get(2)?,
@@ -143,14 +200,7 @@ pub fn create_root_node(
     conn.execute(
         "
         INSERT INTO nodes (
-            id,
-            parent_id,
-            title,
-            description,
-            status,
-            sort_order,
-            created_at,
-            updated_at
+            id, parent_id, title, description, status, sort_order, created_at, updated_at
         )
         VALUES (?1, NULL, ?2, ?3, 'idle', 0.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ",
@@ -160,12 +210,7 @@ pub fn create_root_node(
 
     conn.execute(
         "
-        INSERT INTO node_positions (
-            node_id,
-            x,
-            y,
-            updated_at
-        )
+        INSERT INTO node_positions (node_id, x, y, updated_at)
         VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP)
         ",
         (&id, input.x, input.y),
@@ -196,6 +241,60 @@ pub fn create_root_node(
         .map_err(|e| e.to_string())?;
 
     Ok(node)
+}
+
+#[tauri::command]
+pub fn set_node_parent(
+    state: State<AppState>,
+    input: SetNodeParentInput,
+) -> Result<(), String> {
+    if input.parent_id.as_ref() == Some(&input.node_id) {
+        return Err("node cannot be parent of itself".to_string());
+    }
+
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|_| "failed to lock database connection".to_string())?;
+
+    let exists: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM nodes WHERE id = ?1",
+            [&input.node_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    if exists == 0 {
+        return Err(format!("node not found: {}", input.node_id));
+    }
+
+    if let Some(parent_id) = &input.parent_id {
+        let parent_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE id = ?1",
+                [parent_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        if parent_exists == 0 {
+            return Err(format!("parent node not found: {}", parent_id));
+        }
+    }
+
+    conn.execute(
+        "
+        UPDATE nodes
+        SET parent_id = ?2,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?1
+        ",
+        (&input.node_id, &input.parent_id),
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command]

@@ -4,6 +4,7 @@ import * as PIXI from "pixi.js";
 import {
   createNode,
   createScene,
+  setParent,
   setupDrag,
   setupPan,
   updateLinks,
@@ -11,8 +12,9 @@ import {
   type NodeModel,
 } from "../core";
 
-type InitialRootNode = {
+type InitialNode = {
   id: string;
+  parent_id: string | null;
   title: string;
   x: number;
   y: number;
@@ -30,7 +32,7 @@ type CreatedNode = {
 };
 
 type PixiCanvasProps = {
-  initialRootNodes?: InitialRootNode[];
+  initialNodes?: InitialNode[];
 };
 
 export function PixiCanvas(props: PixiCanvasProps) {
@@ -50,6 +52,7 @@ export function PixiCanvas(props: PixiCanvasProps) {
     container.appendChild(app.canvas);
 
     const { world, linksLayer, nodesLayer } = createScene(app);
+
     const uiLayer = new PIXI.Container();
     app.stage.addChild(uiLayer);
 
@@ -78,8 +81,22 @@ export function PixiCanvas(props: PixiCanvasProps) {
       return node;
     };
 
-    for (const root of props.initialRootNodes ?? []) {
-      createAndBindNode(root.x, root.y, root.id);
+    const nodeById = new Map<string, NodeModel>();
+
+    for (const item of props.initialNodes ?? []) {
+      const node = createAndBindNode(item.x, item.y, item.id);
+      nodeById.set(item.id, node);
+    }
+
+    for (const item of props.initialNodes ?? []) {
+      if (!item.parent_id) continue;
+
+      const child = nodeById.get(item.id);
+      const parent = nodeById.get(item.parent_id);
+
+      if (!child || !parent) continue;
+
+      setParent(parent, child, links, linksLayer);
     }
 
     const createButton = new PIXI.Graphics();
@@ -113,7 +130,8 @@ export function PixiCanvas(props: PixiCanvasProps) {
           },
         });
 
-        createAndBindNode(x, y, created.id);
+        const node = createAndBindNode(x, y, created.id);
+        nodeById.set(created.id, node);
       } catch (error) {
         console.error("failed to create root node", error);
       }
@@ -128,5 +146,5 @@ export function PixiCanvas(props: PixiCanvasProps) {
     });
   });
 
-  return <div ref={container!} style={{ width: "100%", height: "100%" }} />;
+  return <div ref={(el) => (container = el)} style={{ width: "100%", height: "80vh" }} />;
 }

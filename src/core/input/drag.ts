@@ -33,8 +33,10 @@ export const setupDrag = ({
     if (!draggingNode) return;
 
     const rect = app.canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (app.renderer.width / rect.width) - world.x;
-    const y = (e.clientY - rect.top) * (app.renderer.height / rect.height) - world.y;
+    const x =
+      (e.clientX - rect.left) * (app.renderer.width / rect.width) - world.x;
+    const y =
+      (e.clientY - rect.top) * (app.renderer.height / rect.height) - world.y;
 
     draggingNode.view.x = x + offsetX;
     draggingNode.view.y = y + offsetY;
@@ -58,8 +60,19 @@ export const setupDrag = ({
       }
     }
 
-    if (targetParent) {
-      setParent(targetParent, child, links, linksLayer);
+    if (targetParent && child.dbId && targetParent.dbId) {
+      try {
+        await invoke("set_node_parent", {
+          input: {
+            node_id: child.dbId,
+            parent_id: targetParent.dbId,
+          },
+        });
+
+        setParent(targetParent, child, links, linksLayer);
+      } catch (error) {
+        console.error("failed to persist parent change", error);
+      }
     }
 
     if (child.dbId) {
