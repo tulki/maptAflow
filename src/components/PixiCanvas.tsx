@@ -10,7 +10,18 @@ import {
   type NodeModel,
 } from "../core";
 
-export function PixiCanvas() {
+type InitialRootNode = {
+  id: string;
+  title: string;
+  x: number;
+  y: number;
+};
+
+type PixiCanvasProps = {
+  initialRootNodes?: InitialRootNode[];
+};
+
+export function PixiCanvas(props: PixiCanvasProps) {
   let container!: HTMLDivElement;
   let app: PIXI.Application;
 
@@ -73,9 +84,20 @@ export function PixiCanvas() {
       createAndBindNode(-world.x, -world.y);
     });
 
-    createAndBindNode(0, 0);
-    createAndBindNode(120, 80);
-    createAndBindNode(-140, 60);
+    const fallbackRoots: InitialRootNode[] = [
+      { id: "local-root-1", title: "Root 1", x: 0, y: 0 },
+      { id: "local-root-2", title: "Root 2", x: 120, y: 80 },
+      { id: "local-root-3", title: "Root 3", x: -140, y: 60 },
+    ];
+
+    const rootsToRender =
+      props.initialRootNodes && props.initialRootNodes.length > 0
+        ? props.initialRootNodes
+        : fallbackRoots;
+
+    rootsToRender.forEach((root) => {
+      createAndBindNode(root.x, root.y);
+    });
 
     onCleanup(() => {
       pan.destroy();

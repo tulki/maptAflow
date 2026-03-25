@@ -1,11 +1,21 @@
-#[derive(Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
-    pub id: i64,
-    pub parent_id: Option<i64>,
-    pub root_id: i64,
+    pub id: String,
+    pub parent_id: Option<String>,
     pub title: String,
-    pub content: Option<String>,
-    pub depth: i32,
-    pub is_done: bool,
+    pub description: Option<String>,
+    pub status: String,
+    pub sort_order: f64,
     pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateRootNodeInput {
+    pub title: String,
+    pub description: Option<String>,
+    pub x: f64,
+    pub y: f64,
 }
