@@ -6,13 +6,12 @@ export const createNode = (
   x: number,
   y: number,
   nodes: NodeModel[],
-  nodesLayer: PIXI.Container
+  nodesLayer: PIXI.Container,
+  dbId: string | null = null
 ) => {
   const g = new PIXI.Graphics();
-
   g.circle(0, 0, NODE_RADIUS);
   g.fill({ color: 0xffffff });
-
   g.x = x;
   g.y = y;
   g.eventMode = "dynamic";
@@ -21,6 +20,7 @@ export const createNode = (
   nodesLayer.addChild(g);
 
   const node: NodeModel = {
+    dbId,
     view: g,
     parent: null,
     children: [],

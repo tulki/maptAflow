@@ -1,6 +1,6 @@
 use crate::app::state::AppState;
 use crate::domain::node::{CreateRootNodeInput, Node};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 use uuid::Uuid;
 
@@ -14,6 +14,13 @@ pub struct RootNodeWithPosition {
     pub sort_order: f64,
     pub created_at: String,
     pub updated_at: String,
+    pub x: f64,
+    pub y: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateNodePositionInput {
+    pub node_id: String,
     pub x: f64,
     pub y: f64,
 }
@@ -65,7 +72,7 @@ pub fn list_root_nodes(state: State<AppState>) -> Result<Vec<Node>, String> {
         })
         .map_err(|e| e.to_string())?;
 
-    let nodes: Result<Vec<Node>, _> = rows.collect();
+    let nodes: Result<Vec<_>, _> = rows.collect();
     nodes.map_err(|e| e.to_string())
 }
 
@@ -117,7 +124,7 @@ pub fn list_root_nodes_with_positions(
         })
         .map_err(|e| e.to_string())?;
 
-    let nodes: Result<Vec<RootNodeWithPosition>, _> = rows.collect();
+    let nodes: Result<Vec<_>, _> = rows.collect();
     nodes.map_err(|e| e.to_string())
 }
 
@@ -189,4 +196,52 @@ pub fn create_root_node(
         .map_err(|e| e.to_string())?;
 
     Ok(node)
+}
+
+#[tauri::command]
+pub fn update_node_position(
+    state: State<AppState>,
+    input: UpdateNodePositionInput,
+) -> Result<(), String> {
+    let conn = state
+        .conn
+        .lock()
+        .map_err(|_| "failed to lock database connection".to_string())?;
+
+    let exists: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM nodes WHERE id = ?1",
+            [&input.node_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+
+    if exists == 0 {
+        return Err(format!("node not found: {}", input.node_id));
+    }
+
+    conn.execute(
+        "
+        INSERT INTO node_positions (node_id, x, y, updated_at)
+        VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP)
+        ON CONFLICT(node_id) DO UPDATE SET
+            x = excluded.x,
+            y = excluded.y,
+            updated_at = CURRENT_TIMESTAMP
+        ",
+        (&input.node_id, input.x, input.y),
+    )
+    .map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "
+        UPDATE nodes
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?1
+        ",
+        [&input.node_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
 }

@@ -1,4 +1,5 @@
 import { onCleanup, onMount } from "solid-js";
+import { invoke } from "@tauri-apps/api/core";
 import * as PIXI from "pixi.js";
 import {
   createNode,
@@ -15,6 +16,17 @@ type InitialRootNode = {
   title: string;
   x: number;
   y: number;
+};
+
+type CreatedNode = {
+  id: string;
+  parent_id: string | null;
+  title: string;
+  description: string | null;
+  status: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 };
 
 type PixiCanvasProps = {
@@ -38,12 +50,13 @@ export function PixiCanvas(props: PixiCanvasProps) {
     container.appendChild(app.canvas);
 
     const { world, linksLayer, nodesLayer } = createScene(app);
+    const uiLayer = new PIXI.Container();
+    app.stage.addChild(uiLayer);
 
     const nodes: NodeModel[] = [];
     const links: LinkModel[] = [];
 
     const pan = setupPan(app.canvas, world);
-
     const drag = setupDrag({
       app,
       world,
@@ -55,24 +68,30 @@ export function PixiCanvas(props: PixiCanvasProps) {
     const tick = () => updateLinks(links);
     app.ticker.add(tick);
 
-    const createAndBindNode = (x: number, y: number) => {
-      const node = createNode(x, y, nodes, nodesLayer);
+    const createAndBindNode = (
+      x: number,
+      y: number,
+      dbId: string | null = null
+    ) => {
+      const node = createNode(x, y, nodes, nodesLayer, dbId);
       drag.makeDraggable(node);
       return node;
     };
+
+    for (const root of props.initialRootNodes ?? []) {
+      createAndBindNode(root.x, root.y, root.id);
+    }
 
     const createButton = new PIXI.Graphics();
     createButton.circle(0, 0, 25);
     createButton.fill({ color: 0x00ff88 });
     createButton.eventMode = "dynamic";
     createButton.cursor = "pointer";
-
-    app.stage.addChild(createButton);
+    uiLayer.addChild(createButton);
 
     const centerButton = () => {
       const w = app.renderer.width / app.renderer.resolution;
       const h = app.renderer.height / app.renderer.resolution;
-
       createButton.x = w / 2;
       createButton.y = h / 2;
     };
@@ -80,44 +99,34 @@ export function PixiCanvas(props: PixiCanvasProps) {
     centerButton();
     app.renderer.on("resize", centerButton);
 
-    createButton.on("pointerdown", () => {
-      createAndBindNode(-world.x, -world.y);
-    });
+    createButton.on("pointerdown", async () => {
+      const x = -world.x;
+      const y = -world.y;
 
-    const fallbackRoots: InitialRootNode[] = [
-      { id: "local-root-1", title: "Root 1", x: 0, y: 0 },
-      { id: "local-root-2", title: "Root 2", x: 120, y: 80 },
-      { id: "local-root-3", title: "Root 3", x: -140, y: 60 },
-    ];
+      try {
+        const created = await invoke<CreatedNode>("create_root_node", {
+          input: {
+            title: "New root node",
+            description: null,
+            x,
+            y,
+          },
+        });
 
-    const rootsToRender =
-      props.initialRootNodes && props.initialRootNodes.length > 0
-        ? props.initialRootNodes
-        : fallbackRoots;
-
-    rootsToRender.forEach((root) => {
-      createAndBindNode(root.x, root.y);
+        createAndBindNode(x, y, created.id);
+      } catch (error) {
+        console.error("failed to create root node", error);
+      }
     });
 
     onCleanup(() => {
       pan.destroy();
       drag.destroy();
-
       app.renderer.off("resize", centerButton);
       app.ticker.remove(tick);
-
       app.destroy(true);
     });
   });
 
-  return (
-    <div
-      ref={container}
-      style={{
-        width: "100%",
-        height: "100%",
-        overflow: "hidden",
-      }}
-    />
-  );
+  return <div ref={container!} style={{ width: "100%", height: "100%" }} />;
 }

@@ -7,6 +7,7 @@ use crate::app::commands::{
     create_root_node,
     list_root_nodes,
     list_root_nodes_with_positions,
+    update_node_position,
 };
 use crate::app::state::AppState;
 use crate::infrastructure::db::connection::open_database;
@@ -32,7 +33,8 @@ pub fn run() {
             count_nodes,
             create_root_node,
             list_root_nodes,
-            list_root_nodes_with_positions
+            list_root_nodes_with_positions,
+            update_node_position
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

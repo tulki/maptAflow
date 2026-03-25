@@ -1,6 +1,7 @@
 import * as PIXI from "pixi.js";
 
 export type NodeModel = {
+  dbId: string | null;
   view: PIXI.Graphics;
   parent: NodeModel | null;
   children: NodeModel[];

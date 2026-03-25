@@ -1,18 +1,58 @@
-html, body {
+html,
+body,
+#root {
   margin: 0;
   padding: 0;
   width: 100%;
   height: 100%;
-  overflow: hidden; /* убираем скролл */
+  overflow: hidden;
   background: #050509;
 }
 
-#root {
-  width: 100%;
-  height: 100%;
+* {
+  box-sizing: border-box;
 }
 
-.app-root {
-  width: 100%;
-  height: 100%;
+.app-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #050509;
+}
+
+.sidebar-overlay {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(10, 10, 16, 0.78);
+  color: #f5f7ff;
+  backdrop-filter: blur(8px);
+}
+
+.sidebar-overlay h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.sidebar-overlay ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.sidebar-overlay li {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.db-status {
+  margin-bottom: 12px;
+  font-size: 14px;
 }

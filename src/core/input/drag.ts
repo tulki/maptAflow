@@ -1,4 +1,5 @@
 import * as PIXI from "pixi.js";
+import { invoke } from "@tauri-apps/api/core";
 import { LINK_SNAP_DISTANCE } from "../constants";
 import { setParent } from "../graph/actions";
 import { canLink, distance } from "../graph/rules";
@@ -32,21 +33,17 @@ export const setupDrag = ({
     if (!draggingNode) return;
 
     const rect = app.canvas.getBoundingClientRect();
-
-    const x =
-      (e.clientX - rect.left) * (app.renderer.width / rect.width) - world.x;
-    const y =
-      (e.clientY - rect.top) * (app.renderer.height / rect.height) - world.y;
+    const x = (e.clientX - rect.left) * (app.renderer.width / rect.width) - world.x;
+    const y = (e.clientY - rect.top) * (app.renderer.height / rect.height) - world.y;
 
     draggingNode.view.x = x + offsetX;
     draggingNode.view.y = y + offsetY;
   };
 
-  const up = () => {
+  const up = async () => {
     if (!draggingNode) return;
 
     const child = draggingNode;
-
     let targetParent: NodeModel | null = null;
     let bestDistance = Infinity;
 
@@ -65,8 +62,21 @@ export const setupDrag = ({
       setParent(targetParent, child, links, linksLayer);
     }
 
-    draggingNode = null;
+    if (child.dbId) {
+      try {
+        await invoke("update_node_position", {
+          input: {
+            node_id: child.dbId,
+            x: child.view.x,
+            y: child.view.y,
+          },
+        });
+      } catch (error) {
+        console.error("failed to persist node position", error);
+      }
+    }
 
+    draggingNode = null;
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
   };
@@ -76,7 +86,6 @@ export const setupDrag = ({
       if (event.button !== 0) return;
 
       draggingNode = node;
-
       offsetX = node.view.x - event.global.x + world.x;
       offsetY = node.view.y - event.global.y + world.y;
 
