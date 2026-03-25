@@ -11,11 +11,3 @@ pub struct Node {
     pub created_at: String,
     pub updated_at: String,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateRootNodeInput {
-    pub title: String,
-    pub description: Option<String>,
-    pub x: f64,
-    pub y: f64,
-}

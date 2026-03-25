@@ -1,8 +1,8 @@
 import { onCleanup, onMount } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
 import * as PIXI from "pixi.js";
 import {
   createNode,
+  createNodeInDb,
   createScene,
   setParent,
   setupDrag,
@@ -10,6 +10,7 @@ import {
   updateLinks,
   type LinkModel,
   type NodeModel,
+  type DbNodeRecord,
 } from "../core";
 
 type InitialNode = {
@@ -18,17 +19,6 @@ type InitialNode = {
   title: string;
   x: number;
   y: number;
-};
-
-type CreatedNode = {
-  id: string;
-  parent_id: string | null;
-  title: string;
-  description: string | null;
-  status: string;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
 };
 
 type PixiCanvasProps = {
@@ -52,7 +42,6 @@ export function PixiCanvas(props: PixiCanvasProps) {
     container.appendChild(app.canvas);
 
     const { world, linksLayer, nodesLayer } = createScene(app);
-
     const uiLayer = new PIXI.Container();
     app.stage.addChild(uiLayer);
 
@@ -95,7 +84,6 @@ export function PixiCanvas(props: PixiCanvasProps) {
       const parent = nodeById.get(item.parent_id);
 
       if (!child || !parent) continue;
-
       setParent(parent, child, links, linksLayer);
     }
 
@@ -121,14 +109,12 @@ export function PixiCanvas(props: PixiCanvasProps) {
       const y = -world.y;
 
       try {
-        const created = await invoke<CreatedNode>("create_node", {
-          input: {
-            title: "New node",
-            description: null,
-            x,
-            y,
-            parent_id: null,
-          },
+        const created: DbNodeRecord = await createNodeInDb({
+          title: "New node",
+          description: null,
+          x,
+          y,
+          parent_id: null,
         });
 
         const node = createAndBindNode(x, y, created.id);

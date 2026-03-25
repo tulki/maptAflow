@@ -1,4 +1,7 @@
+use rusqlite::Error as SqlError;
 use std::fmt::{Display, Formatter};
+
+pub type AppResult<T> = Result<T, AppError>;
 
 #[derive(Debug)]
 pub enum AppError {
@@ -18,3 +21,9 @@ impl Display for AppError {
 }
 
 impl std::error::Error for AppError {}
+
+impl From<SqlError> for AppError {
+    fn from(value: SqlError) -> Self {
+        Self::Database(value.to_string())
+    }
+}

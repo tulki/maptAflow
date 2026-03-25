@@ -1,9 +1,9 @@
 import * as PIXI from "pixi.js";
-import { invoke } from "@tauri-apps/api/core";
 import { LINK_SNAP_DISTANCE } from "../constants";
 import { setParent } from "../graph/actions";
 import { canLink, distance } from "../graph/rules";
 import type { LinkModel, NodeModel } from "../graph/types";
+import { setNodeParent, updateNodePosition } from "../api/nodes";
 
 type DragControllerOptions = {
   app: PIXI.Application;
@@ -62,11 +62,9 @@ export const setupDrag = ({
 
     if (targetParent && child.dbId && targetParent.dbId) {
       try {
-        await invoke("set_node_parent", {
-          input: {
-            node_id: child.dbId,
-            parent_id: targetParent.dbId,
-          },
+        await setNodeParent({
+          node_id: child.dbId,
+          parent_id: targetParent.dbId,
         });
 
         setParent(targetParent, child, links, linksLayer);
@@ -77,12 +75,10 @@ export const setupDrag = ({
 
     if (child.dbId) {
       try {
-        await invoke("update_node_position", {
-          input: {
-            node_id: child.dbId,
-            x: child.view.x,
-            y: child.view.y,
-          },
+        await updateNodePosition({
+          node_id: child.dbId,
+          x: child.view.x,
+          y: child.view.y,
         });
       } catch (error) {
         console.error("failed to persist node position", error);
