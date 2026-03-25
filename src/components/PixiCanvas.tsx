@@ -121,19 +121,20 @@ export function PixiCanvas(props: PixiCanvasProps) {
       const y = -world.y;
 
       try {
-        const created = await invoke<CreatedNode>("create_root_node", {
+        const created = await invoke<CreatedNode>("create_node", {
           input: {
-            title: "New root node",
+            title: "New node",
             description: null,
             x,
             y,
+            parent_id: null,
           },
         });
 
         const node = createAndBindNode(x, y, created.id);
         nodeById.set(created.id, node);
       } catch (error) {
-        console.error("failed to create root node", error);
+        console.error("failed to create node", error);
       }
     });
 

@@ -4,7 +4,7 @@ pub mod infrastructure;
 
 use crate::app::commands::{
     count_nodes,
-    create_root_node,
+    create_node,
     list_nodes_with_positions,
     list_root_nodes,
     list_root_nodes_with_positions,
@@ -32,7 +32,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             count_nodes,
-            create_root_node,
+            create_node,
             list_root_nodes,
             list_root_nodes_with_positions,
             list_nodes_with_positions,

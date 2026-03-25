@@ -1,5 +1,5 @@
 use crate::app::state::AppState;
-use crate::domain::node::{CreateRootNodeInput, Node};
+use crate::domain::node::Node;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use uuid::Uuid;
@@ -16,6 +16,15 @@ pub struct NodeWithPosition {
     pub updated_at: String,
     pub x: f64,
     pub y: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateNodeInput {
+    pub title: String,
+    pub description: Option<String>,
+    pub x: f64,
+    pub y: f64,
+    pub parent_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -186,14 +195,28 @@ pub fn list_nodes_with_positions(
 }
 
 #[tauri::command]
-pub fn create_root_node(
+pub fn create_node(
     state: State<AppState>,
-    input: CreateRootNodeInput,
+    input: CreateNodeInput,
 ) -> Result<Node, String> {
     let conn = state
         .conn
         .lock()
         .map_err(|_| "failed to lock database connection".to_string())?;
+
+    if let Some(parent_id) = &input.parent_id {
+        let parent_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nodes WHERE id = ?1",
+                [parent_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        if parent_exists == 0 {
+            return Err(format!("parent node not found: {}", parent_id));
+        }
+    }
 
     let id = Uuid::new_v4().to_string();
 
@@ -202,9 +225,9 @@ pub fn create_root_node(
         INSERT INTO nodes (
             id, parent_id, title, description, status, sort_order, created_at, updated_at
         )
-        VALUES (?1, NULL, ?2, ?3, 'idle', 0.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?1, ?2, ?3, ?4, 'idle', 0.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ",
-        (&id, &input.title, &input.description),
+        (&id, &input.parent_id, &input.title, &input.description),
     )
     .map_err(|e| e.to_string())?;
 
