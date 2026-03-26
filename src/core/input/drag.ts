@@ -1,102 +1,84 @@
 import * as PIXI from "pixi.js";
-import { LINK_SNAP_DISTANCE } from "../constants";
-import { setParent } from "../graph/actions";
-import { canLink, distance } from "../graph/rules";
-import type { LinkModel, NodeModel } from "../graph/types";
-import { setNodeParent, updateNodePosition } from "../api/nodes";
 
-type DragControllerOptions = {
-  app: PIXI.Application;
-  world: PIXI.Container;
-  nodes: NodeModel[];
-  links: LinkModel[];
-  linksLayer: PIXI.Container;
+export type DragPosition = {
+  x: number;
+  y: number;
 };
 
-type DragController = {
-  makeDraggable: (node: NodeModel) => void;
+export type DraggableTarget = {
+  view: PIXI.Graphics;
+};
+
+type DragControllerOptions<T extends DraggableTarget> = {
+  app: PIXI.Application;
+  world: PIXI.Container;
+  onMove: (target: T, position: DragPosition) => void;
+  onEnd: (target: T) => void | Promise<void>;
+};
+
+type DragController<T extends DraggableTarget> = {
+  makeDraggable: (target: T) => void;
   destroy: () => void;
 };
 
-export const setupDrag = ({
+export const setupDrag = <T extends DraggableTarget>({
   app,
   world,
-  nodes,
-  links,
-  linksLayer,
-}: DragControllerOptions): DragController => {
-  let draggingNode: NodeModel | null = null;
+  onMove,
+  onEnd,
+}: DragControllerOptions<T>): DragController<T> => {
+  let draggingTarget: T | null = null;
   let offsetX = 0;
   let offsetY = 0;
 
-  const move = (e: PointerEvent) => {
-    if (!draggingNode) return;
-
+  const toWorldPosition = (e: PointerEvent): DragPosition => {
     const rect = app.canvas.getBoundingClientRect();
+
     const x =
       (e.clientX - rect.left) * (app.renderer.width / rect.width) - world.x;
     const y =
       (e.clientY - rect.top) * (app.renderer.height / rect.height) - world.y;
 
-    draggingNode.view.x = x + offsetX;
-    draggingNode.view.y = y + offsetY;
+    return { x, y };
+  };
+
+  const move = (e: PointerEvent) => {
+    if (!draggingTarget) {
+      return;
+    }
+
+    const position = toWorldPosition(e);
+
+    onMove(draggingTarget, {
+      x: position.x + offsetX,
+      y: position.y + offsetY,
+    });
   };
 
   const up = async () => {
-    if (!draggingNode) return;
-
-    const child = draggingNode;
-    let targetParent: NodeModel | null = null;
-    let bestDistance = Infinity;
-
-    for (const node of nodes) {
-      if (node === child) continue;
-      if (!canLink(node, child)) continue;
-
-      const d = distance(node, child);
-      if (d < LINK_SNAP_DISTANCE && d < bestDistance) {
-        bestDistance = d;
-        targetParent = node;
-      }
+    if (!draggingTarget) {
+      return;
     }
 
-    if (targetParent && child.dbId && targetParent.dbId) {
-      try {
-        await setNodeParent({
-          node_id: child.dbId,
-          parent_id: targetParent.dbId,
-        });
+    const target = draggingTarget;
+    draggingTarget = null;
 
-        setParent(targetParent, child, links, linksLayer);
-      } catch (error) {
-        console.error("failed to persist parent change", error);
-      }
-    }
-
-    if (child.dbId) {
-      try {
-        await updateNodePosition({
-          node_id: child.dbId,
-          x: child.view.x,
-          y: child.view.y,
-        });
-      } catch (error) {
-        console.error("failed to persist node position", error);
-      }
-    }
-
-    draggingNode = null;
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
+
+    await onEnd(target);
   };
 
-  const makeDraggable = (node: NodeModel) => {
-    node.view.on("pointerdown", (event: PIXI.FederatedPointerEvent) => {
-      if (event.button !== 0) return;
+  const makeDraggable = (target: T) => {
+    target.view.on("pointerdown", (event: PIXI.FederatedPointerEvent) => {
+      if (event.button !== 0) {
+        return;
+      }
 
-      draggingNode = node;
-      offsetX = node.view.x - event.global.x + world.x;
-      offsetY = node.view.y - event.global.y + world.y;
+      draggingTarget = target;
+
+      offsetX = target.view.x - event.global.x + world.x;
+      offsetY = target.view.y - event.global.y + world.y;
 
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);

@@ -15,8 +15,14 @@ export {
 export * from "./graph/types";
 export * from "./graph/rules";
 export * from "./graph/actions";
+
+export * from "./canvas/types";
+export * from "./canvas/store";
+export * from "./canvas/drag-node";
+
 export * from "./render/scene";
 export * from "./render/links";
 export * from "./render/nodes";
+
 export * from "./input/pan";
 export * from "./input/drag";

@@ -1,17 +1,11 @@
 import { onCleanup, onMount } from "solid-js";
 import * as PIXI from "pixi.js";
-import {
-  createNode,
-  createNodeInDb,
-  createScene,
-  setParent,
-  setupDrag,
-  setupPan,
-  updateLinks,
-  type LinkModel,
-  type NodeModel,
-  type DbNodeRecord,
-} from "../core";
+import { createNode as createNodeInDb, type Node as DbNodeRecord } from "../core/api/nodes";
+import { createNodeDragController } from "../core/canvas/drag-node";
+import { createCanvasStore } from "../core/canvas/store";
+import type { CanvasNode } from "../core/canvas/types";
+import { setupPan } from "../core/input/pan";
+import { createScene } from "../core/render/scene";
 
 type InitialNode = {
   id: string;
@@ -45,32 +39,35 @@ export function PixiCanvas(props: PixiCanvasProps) {
     const uiLayer = new PIXI.Container();
     app.stage.addChild(uiLayer);
 
-    const nodes: NodeModel[] = [];
-    const links: LinkModel[] = [];
-
-    const pan = setupPan(app.canvas, world);
-    const drag = setupDrag({
-      app,
-      world,
-      nodes,
-      links,
+    const store = createCanvasStore({
+      nodesLayer,
       linksLayer,
     });
 
-    const tick = () => updateLinks(links);
+    const pan = setupPan(app.canvas, world);
+    const drag = createNodeDragController({
+      app,
+      world,
+      store,
+    });
+
+    const tick = () => {
+      store.syncLinks();
+    };
+
     app.ticker.add(tick);
+
+    const nodeById = new Map<string, CanvasNode>();
 
     const createAndBindNode = (
       x: number,
       y: number,
       dbId: string | null = null
-    ) => {
-      const node = createNode(x, y, nodes, nodesLayer, dbId);
+    ): CanvasNode => {
+      const node = store.createNode(x, y, dbId);
       drag.makeDraggable(node);
       return node;
     };
-
-    const nodeById = new Map<string, NodeModel>();
 
     for (const item of props.initialNodes ?? []) {
       const node = createAndBindNode(item.x, item.y, item.id);
@@ -78,13 +75,18 @@ export function PixiCanvas(props: PixiCanvasProps) {
     }
 
     for (const item of props.initialNodes ?? []) {
-      if (!item.parent_id) continue;
+      if (!item.parent_id) {
+        continue;
+      }
 
       const child = nodeById.get(item.id);
       const parent = nodeById.get(item.parent_id);
 
-      if (!child || !parent) continue;
-      setParent(parent, child, links, linksLayer);
+      if (!child || !parent) {
+        continue;
+      }
+
+      store.setParent(parent, child);
     }
 
     const createButton = new PIXI.Graphics();
@@ -97,6 +99,7 @@ export function PixiCanvas(props: PixiCanvasProps) {
     const centerButton = () => {
       const w = app.renderer.width / app.renderer.resolution;
       const h = app.renderer.height / app.renderer.resolution;
+
       createButton.x = w / 2;
       createButton.y = h / 2;
     };
@@ -129,6 +132,7 @@ export function PixiCanvas(props: PixiCanvasProps) {
       drag.destroy();
       app.renderer.off("resize", centerButton);
       app.ticker.remove(tick);
+      store.destroy();
       app.destroy(true);
     });
   });

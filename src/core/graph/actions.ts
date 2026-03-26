@@ -1,50 +1,31 @@
-import * as PIXI from "pixi.js";
-import type { LinkModel, NodeModel } from "./types";
 import { canLink } from "./rules";
+import type { NodeModel } from "./types";
 
-export const removeChildFromParent = (child: NodeModel) => {
-  if (!child.parent) return;
+export const removeChildFromParent = (child: NodeModel): boolean => {
+  if (!child.parent) {
+    return false;
+  }
 
   const oldParent = child.parent;
-  oldParent.children = oldParent.children.filter((n) => n !== child);
+  oldParent.children = oldParent.children.filter((node) => node !== child);
   child.parent = null;
+
+  return true;
 };
 
-export const removeExistingLinkToChild = (
-  child: NodeModel,
-  links: LinkModel[],
-  linksLayer: PIXI.Container
-) => {
-  const index = links.findIndex((l) => l.child === child);
-  if (index === -1) return;
+export const setParent = (parent: NodeModel, child: NodeModel): boolean => {
+  if (!canLink(parent, child)) {
+    return false;
+  }
 
-  const oldLink = links[index];
-  linksLayer.removeChild(oldLink.line);
-  oldLink.line.destroy();
-  links.splice(index, 1);
-};
-
-export const setParent = (
-  parent: NodeModel,
-  child: NodeModel,
-  links: LinkModel[],
-  linksLayer: PIXI.Container
-) => {
-  if (!canLink(parent, child)) return;
-  if (child.parent === parent) return;
+  if (child.parent === parent) {
+    return false;
+  }
 
   removeChildFromParent(child);
-  removeExistingLinkToChild(child, links, linksLayer);
 
   child.parent = parent;
   parent.children.push(child);
 
-  const line = new PIXI.Graphics();
-  linksLayer.addChild(line);
-
-  links.push({
-    parent,
-    child,
-    line,
-  });
+  return true;
 };
