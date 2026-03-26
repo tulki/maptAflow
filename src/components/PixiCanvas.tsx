@@ -1,22 +1,18 @@
 import { onCleanup, onMount } from "solid-js";
 import * as PIXI from "pixi.js";
-import { createNode as createNodeInDb, type Node as DbNodeRecord } from "../core/api/nodes";
-import { createNodeDragController } from "../core/canvas/drag-node";
 import { createCanvasStore } from "../core/canvas/store";
 import type { CanvasNode } from "../core/canvas/types";
 import { setupPan } from "../core/input/pan";
 import { createScene } from "../core/render/scene";
-
-type InitialNode = {
-  id: string;
-  parent_id: string | null;
-  title: string;
-  x: number;
-  y: number;
-};
+import { createNodeAtViewOrigin } from "../core/usecases/create-node";
+import {
+  hydrateCanvas,
+  type CanvasInitialNode,
+} from "../core/usecases/hydrate-canvas";
+import { createNodeDragUseCase } from "../core/usecases/node-drag";
 
 type PixiCanvasProps = {
-  initialNodes?: InitialNode[];
+  initialNodes?: CanvasInitialNode[];
 };
 
 export function PixiCanvas(props: PixiCanvasProps) {
@@ -45,7 +41,7 @@ export function PixiCanvas(props: PixiCanvasProps) {
     });
 
     const pan = setupPan(app.canvas, world);
-    const drag = createNodeDragController({
+    const drag = createNodeDragUseCase({
       app,
       world,
       store,
@@ -57,8 +53,6 @@ export function PixiCanvas(props: PixiCanvasProps) {
 
     app.ticker.add(tick);
 
-    const nodeById = new Map<string, CanvasNode>();
-
     const createAndBindNode = (
       x: number,
       y: number,
@@ -69,25 +63,13 @@ export function PixiCanvas(props: PixiCanvasProps) {
       return node;
     };
 
-    for (const item of props.initialNodes ?? []) {
-      const node = createAndBindNode(item.x, item.y, item.id);
-      nodeById.set(item.id, node);
-    }
-
-    for (const item of props.initialNodes ?? []) {
-      if (!item.parent_id) {
-        continue;
-      }
-
-      const child = nodeById.get(item.id);
-      const parent = nodeById.get(item.parent_id);
-
-      if (!child || !parent) {
-        continue;
-      }
-
-      store.setParent(parent, child);
-    }
+    const nodeById = hydrateCanvas({
+      initialNodes: props.initialNodes,
+      createAndBindNode,
+      linkNodes: (parent, child) => {
+        store.setParent(parent, child);
+      },
+    });
 
     const createButton = new PIXI.Graphics();
     createButton.circle(0, 0, 25);
@@ -108,20 +90,14 @@ export function PixiCanvas(props: PixiCanvasProps) {
     app.renderer.on("resize", centerButton);
 
     createButton.on("pointerdown", async () => {
-      const x = -world.x;
-      const y = -world.y;
-
       try {
-        const created: DbNodeRecord = await createNodeInDb({
-          title: "New node",
-          description: null,
-          x,
-          y,
-          parent_id: null,
+        await createNodeAtViewOrigin({
+          world,
+          createAndBindNode,
+          registerNode: (id, node) => {
+            nodeById.set(id, node);
+          },
         });
-
-        const node = createAndBindNode(x, y, created.id);
-        nodeById.set(created.id, node);
       } catch (error) {
         console.error("failed to create node", error);
       }
@@ -137,5 +113,10 @@ export function PixiCanvas(props: PixiCanvasProps) {
     });
   });
 
-  return <div ref={(el) => (container = el)} style={{ width: "100%", height: "80vh" }} />;
+  return (
+    <div
+      ref={(el) => (container = el)}
+      style={{ width: "100%", height: "80vh" }}
+    />
+  );
 }
