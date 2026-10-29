@@ -1,0 +1,9 @@
+name: README check
+on: [push]
+jobs:
+  readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check README
+        run: grep -i "project" README.md
