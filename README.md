@@ -164,3 +164,24 @@ The point is not to squeeze users for money.
 The point is to build something useful, honest, and technically respectable.
 
 If a hosted sync layer exists in the future, self-hosting should remain possible.
+## Development
+
+Stack: Tauri 2 (Rust + SQLite via rusqlite) and SolidJS + PixiJS (TypeScript, Vite).
+
+Prerequisites: Node.js 22, Rust stable, Tauri 2 system packages
+(Linux: `libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev`), pnpm
+(`src-tauri/tauri.conf.json` runs `pnpm dev` / `pnpm build`).
+
+```
+npm install                       # frontend dependencies
+npm run tauri dev                 # run the desktop app
+npm run typecheck                 # TypeScript check
+npm test                          # graph rules, drop use case, SQL tree-integrity tests
+npm run build                     # frontend build into dist/
+cd src-tauri && cargo test --locked   # Rust service tests (in-memory SQLite)
+```
+
+The local database is created as `maptaflow.db` in the working directory of the process.
+
+CI (`.github/workflows/ci.yml`) runs the same checks on every push and pull request.
+Rules for AI coding agents are in `AGENTS.md`, acceptance criteria in `docs/acceptance-criteria.md`.
