@@ -94,6 +94,12 @@ pub fn set_node_parent(state: &AppState, input: SetNodeParentInput) -> AppResult
             parent_id_value,
             AppError::NotFound(format!("parent node not found: {}", parent_id_value)),
         )?;
+
+        if node_repository::would_create_cycle(&conn, &node_id, parent_id_value)? {
+            return Err(AppError::Validation(
+                "node cannot be moved under its own descendant".to_string(),
+            ));
+        }
     }
 
     node_repository::update_node_parent(&conn, &node_id, parent_id.as_deref())
@@ -117,4 +123,99 @@ pub fn update_node_position(
     node_repository::touch_node_updated_at(&conn, &node_id)?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infrastructure::db::connection::open_database;
+    use std::sync::Mutex;
+
+    fn test_state() -> AppState {
+        let conn = open_database(":memory:").expect("in-memory database");
+        AppState {
+            conn: Mutex::new(conn),
+        }
+    }
+
+    fn add_node(state: &AppState, parent_id: Option<&str>) -> String {
+        create_node(
+            state,
+            CreateNodeInput {
+                title: "test node".to_string(),
+                description: None,
+                x: 0.0,
+                y: 0.0,
+                parent_id: parent_id.map(str::to_string),
+            },
+        )
+        .expect("create node")
+        .id
+    }
+
+    fn reparent(state: &AppState, node_id: &str, parent_id: Option<&str>) -> AppResult<()> {
+        set_node_parent(
+            state,
+            SetNodeParentInput {
+                node_id: node_id.to_string(),
+                parent_id: parent_id.map(str::to_string),
+            },
+        )
+    }
+
+    fn parent_of(state: &AppState, node_id: &str) -> Option<String> {
+        let conn = state.conn.lock().expect("lock");
+        node_repository::get_node_by_id(&conn, node_id)
+            .expect("node")
+            .parent_id
+    }
+
+    #[test]
+    fn rejects_moving_node_under_its_own_descendant() {
+        let state = test_state();
+        let a = add_node(&state, None);
+        let b = add_node(&state, Some(&a));
+        let c = add_node(&state, Some(&b));
+
+        let result = reparent(&state, &a, Some(&c));
+
+        assert!(matches!(result, Err(AppError::Validation(_))));
+        assert_eq!(parent_of(&state, &a), None);
+    }
+
+    #[test]
+    fn rejects_self_parent() {
+        let state = test_state();
+        let a = add_node(&state, None);
+
+        assert!(matches!(
+            reparent(&state, &a, Some(&a)),
+            Err(AppError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn allows_valid_reparent_and_detach() {
+        let state = test_state();
+        let a = add_node(&state, None);
+        let b = add_node(&state, Some(&a));
+        let c = add_node(&state, Some(&b));
+
+        reparent(&state, &c, Some(&a)).expect("move C under A");
+        assert_eq!(parent_of(&state, &c), Some(a.clone()));
+
+        reparent(&state, &b, None).expect("detach B");
+        assert_eq!(parent_of(&state, &b), None);
+    }
+
+    #[test]
+    fn missing_parent_is_not_found() {
+        let state = test_state();
+        let a = add_node(&state, None);
+
+        assert!(matches!(
+            reparent(&state, &a, Some("missing")),
+            Err(AppError::NotFound(_))
+        ));
+    }
 }

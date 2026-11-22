@@ -3,6 +3,8 @@ use crate::app::errors::{AppError, AppResult};
 use crate::domain::node::Node;
 use rusqlite::{Connection, OptionalExtension, Row};
 
+const WOULD_CREATE_CYCLE_SQL: &str = include_str!("../../db/queries/would_create_cycle.sql");
+
 fn map_node(row: &Row<'_>) -> rusqlite::Result<Node> {
     Ok(Node {
         id: row.get(0)?,
@@ -168,4 +170,19 @@ pub fn touch_node_updated_at(conn: &Connection, node_id: &str) -> AppResult<()> 
     )?;
 
     Ok(())
+}
+
+/// Returns true if making `new_parent_id` the parent of `node_id` would close a cycle,
+/// i.e. `node_id` is `new_parent_id` itself or one of its ancestors.
+/// `UNION` (not `UNION ALL`) keeps the walk finite even if the table already has a cycle.
+pub fn would_create_cycle(
+    conn: &Connection,
+    node_id: &str,
+    new_parent_id: &str,
+) -> AppResult<bool> {
+    let found: i64 = conn.query_row(WOULD_CREATE_CYCLE_SQL, (node_id, new_parent_id), |row| {
+        row.get(0)
+    })?;
+
+    Ok(found != 0)
 }
