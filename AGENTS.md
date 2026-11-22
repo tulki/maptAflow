@@ -69,7 +69,7 @@ Reading any file in the repo is allowed. Writing is allowed only inside the file
 ## 6. Coding conventions
 
 - TypeScript: `strict`, no `any`, named exports, small pure functions in `src/core/graph` and `src/core/usecases`.
-- Only `src/core/api/nodes.ts` may import `@tauri-apps/api`. Other code uses `NodeGateway`.
+- Only `src/core/api/nodes.ts` may import `@tauri-apps/api`. New persistence calls in use cases go through `NodeGateway`.
 - Rust: errors go through `AppError` (`Database`, `NotFound`, `Validation`), no `unwrap()` outside tests.
 - SQL lives in `.sql` files or repository functions, always with bound parameters (`?1`), never string formatting.
 - Files end with a newline (`.editorconfig`).
